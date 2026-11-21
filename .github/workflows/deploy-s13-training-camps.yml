@@ -54,7 +54,7 @@ jobs:
       - name: Export Docker image
         run: |
           set -euo pipefail
-          docker save "s13-training-camps:${IMAGE_TAG}" | gzip > "s13-training-camps-${IMAGE_TAG}.tar.gz"
+          docker save "${IMAGE_NAME}:${IMAGE_TAG}" | gzip > "s13-training-camps-${IMAGE_TAG}.tar.gz"
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
@@ -73,12 +73,13 @@ jobs:
         run: |
           set -euo pipefail
           docker volume create s13-training-camps-data >/dev/null
+          docker pull "${IMAGE_NAME}:${IMAGE_TAG}"
           docker run --detach \
             --name s13-training-camps \
             --restart unless-stopped \
             --publish 8080:8080 \
             --volume s13-training-camps-data:/data \
-            "s13-training-camps:${IMAGE_TAG}"
+            "${IMAGE_NAME}:${IMAGE_TAG}"
 
       - name: Verify deployment health
         run: |
@@ -86,7 +87,6 @@ jobs:
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error "http://127.0.0.1:8080/health" >/dev/null && \
                curl --fail --silent --show-error "http://127.0.0.1:8080/api/courses" >/dev/null; then
-              docker ps --filter name=s13-training-camps
               echo "The S13 Training Camps container is healthy with image tag ${IMAGE_TAG}."
               exit 0
             fi
@@ -95,3 +95,19 @@ jobs:
           docker ps --all --filter name=s13-training-camps
           docker logs --tail=100 s13-training-camps || true
           exit 1
+
+      - name: Show running container
+        run: |
+          set -euo pipefail
+          docker inspect --format '{{.State.Running}}' s13-training-camps | grep -qx true
+          echo "## Running Docker container" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Name | \`$(docker inspect --format '{{.Name}}' s13-training-camps | sed 's#^/##')\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`$(docker inspect --format '{{.Config.Image}}' s13-training-camps)\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Container ID | \`$(docker inspect --format '{{.Id}}' s13-training-camps)\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | \`$(docker inspect --format '{{.State.Status}}' s13-training-camps)\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Ports | $(docker inspect --format '{{json .NetworkSettings.Ports}}' s13-training-camps) |" >> "$GITHUB_STEP_SUMMARY"
+          echo
+          docker ps --filter name=s13-training-camps --no-trunc
