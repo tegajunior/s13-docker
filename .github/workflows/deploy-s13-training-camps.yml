@@ -30,6 +30,7 @@ jobs:
           set -euo pipefail
           commit_sha="$(git rev-parse HEAD)"
           image_tag="${commit_sha: -4}"
+          echo "IMAGE_NAME=devopseasylearning/s13-training-camps" >> "$GITHUB_ENV"
           printf 'IMAGE_TAG=%s\n' "$image_tag" >> "$GITHUB_ENV"
           echo "Building the S13 image with tag: $image_tag"
 
@@ -37,6 +38,18 @@ jobs:
         run: |
           set -euo pipefail
           docker build --pull --tag "s13-training-camps:${IMAGE_TAG}" .
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: devopseasylearning
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push image to Docker Hub
+        run: |
+          set -euo pipefail
+          docker tag "s13-training-camps:${IMAGE_TAG}" "${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
 
       - name: Export Docker image
         run: |
