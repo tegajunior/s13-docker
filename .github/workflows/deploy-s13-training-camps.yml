@@ -38,6 +38,19 @@ jobs:
           set -euo pipefail
           docker build --pull --tag "s13-training-camps:${IMAGE_TAG}" .
 
+      - name: Export Docker image
+        run: |
+          set -euo pipefail
+          docker save "s13-training-camps:${IMAGE_TAG}" | gzip > "s13-training-camps-${IMAGE_TAG}.tar.gz"
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: s13-training-camps-${{ env.IMAGE_TAG }}
+          path: s13-training-camps-${{ env.IMAGE_TAG }}.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Take down current application
         run: |
           set -euo pipefail
